@@ -1,0 +1,39 @@
+# Power cycle a server using Cisco Intersight
+# ansible-playbook reboot.yaml -e servername=cx-imm-fi4-1-1
+---
+- name: Power cycle a server using Cisco Intersight
+  hosts: localhost
+  gather_facts: no
+  vars:
+    intersight_organization: "default"
+    server_name: "{{ servername }}"
+
+  module_defaults:
+    cisco.intersight.intersight_rest_api:
+      api_private_key: "{{ api_private_key }}"
+      api_key_id: "{{ api_key_id }}"
+
+  tasks:
+    - name: Get server Moid by name
+      intersight_rest_api:
+        resource_path: "/compute/ServerSettings"
+        query_params:
+          $filter: "Name eq '{{ server_name }}'"
+      register: server_info
+
+    - name: Fail if server not found
+      fail:
+        msg: "Server '{{ server_name }}' not found in Intersight."
+      when: server_info.api_response | length == 0
+
+    - name: Power cycle the server
+      intersight_rest_api:
+        resource_path: "/compute/ServerSettings/{{ server_info.api_response.Moid }}"
+        api_body:
+          AdminPowerState: "PowerCycle"
+        update_method: patch
+      register: power_cycle_result
+
+    - name: Show power cycle result
+      debug:
+        var: power_cycle_result
